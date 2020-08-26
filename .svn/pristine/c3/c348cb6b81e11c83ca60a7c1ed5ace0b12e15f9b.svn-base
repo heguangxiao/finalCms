@@ -1,0 +1,246 @@
+<%@page import="gk.myname.vn.entity.UserAction"%>
+<%@page import="gk.myname.vn.entity.Telco_Nations"%>
+<%@page import="gk.myname.vn.entity.MnpPhone"%>
+<%@page import="java.text.SimpleDateFormat"%>
+<%@page import="java.util.Date"%>
+<%@page import="gk.myname.vn.utils.RequestTool"%>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd"><%@page contentType="text/html; charset=utf-8" %>
+<html>
+    <head><%@include file="/admin/includes/header.jsp" %></head>
+    <link rel="stylesheet" type="text/css" href="<%= request.getContextPath()%>/admin/resource/select2/select2.css" />
+    <script type="text/javascript" src="<%= request.getContextPath()%>/admin/resource/select2/select2.js"></script>
+    <script type="text/javascript" src="<%= request.getContextPath()%>/admin/resource/select2/select2_locale_vi.js"></script>
+    <script type="text/javascript" language="javascript">
+        //------
+        $(document).ready(function () {
+            $("#opermnp").select2({
+                formatResult: function (item) {
+                    return ('<div>' + item.text + '</div>');
+                },
+                formatSelection: function (item) {
+                    return (item.text);
+                },
+                dropdownCssClass: "bigdrop", // apply css that makes the dropdown taller
+                escapeMarkup: function (m) {
+                    return m;
+                }
+            });
+            $("#operorg").select2({
+                formatResult: function (item) {
+                    return ('<div>' + item.text + '</div>');
+                },
+                formatSelection: function (item) {
+                    return (item.text);
+                },
+                dropdownCssClass: "bigdrop", // apply css that makes the dropdown taller
+                escapeMarkup: function (m) {
+                    return m;
+                }
+            });
+        });
+    </script>
+    <body>
+        <%            //--
+            if (!userlogin.checkAdd(request)) {
+                UserAction log = new UserAction(userlogin.getUserName(),
+                        "mnp_phones",
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.FAIL.val,
+                        "Bạn không có quyền truy cập trang này!");
+                log.logAction(request);
+                session.setAttribute("mess", "Bạn không có quyền truy cập trang này!");
+                response.sendRedirect(request.getContextPath() + "/admin/index.jsp");
+                return;
+            }
+            
+            MnpPhone dao = new MnpPhone();
+            String message = "";
+            ArrayList<MnpPhone> arrayList = dao.getAll();
+            String checkPhone = "";
+            for (MnpPhone elem : arrayList) {
+                    if (elem.getPhone().length() == 10) {
+                        checkPhone += elem.getPhone().substring(1, 10) + ",";
+                    }
+                    if (elem.getPhone().length() == 11) {
+                        checkPhone += elem.getPhone().substring(2, 11) + ",";
+                    }
+                }
+            
+            if (request.getParameter("submit") != null) {
+                //---------------------------
+                String phone = RequestTool.getString(request, "phone");
+                
+                if (!Tool.stringIsNumberPhone(phone)) {
+                    session.setAttribute("mess", "Số điện thoại không đúng định dạng. <br/>Định dạng đúng như sau <br/>VD 1: 0975034483 <br/>VD 2: 84975034483");
+                    response.sendRedirect(request.getContextPath() + "/admin/mnp_phone/add.jsp");
+                    return;
+                }
+                
+                String hone = "";
+                if (phone.length() == 10) {
+                    hone = phone.substring(1, 10);
+                }
+                if (phone.length() == 11) {
+                    hone = phone.substring(2, 11);
+                }
+                
+                
+                if (checkPhone.contains(hone)) {                    
+                    message += "Số này đã tồn tại, vui lòng tìm kiếm để chỉnh sửa <br/> "; 
+                    UserAction log = new UserAction(userlogin.getUserName(),
+                        "mnp_phones",
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.FAIL.val,
+                        "Số " + phone + " đã tồn tại, vui lòng tìm kiếm để chỉnh sửa!");
+                    log.logAction(request);
+                } else {
+                    String opermnp = RequestTool.getString(request, "opermnp");
+                    String operorg = RequestTool.getString(request, "operorg");
+                    if (Tool.checkNull(opermnp) || Tool.checkNull(operorg)) {
+                        message += "Bạn phải nhập đầy đủ thông tin để thêm mới <br/> "; 
+                        UserAction log = new UserAction(userlogin.getUserName(),
+                            "mnp_phones",
+                            UserAction.TYPE.ADD.val,
+                            UserAction.RESULT.FAIL.val,
+                            "Nhập thông tin không đầy đủ!");
+                        log.logAction(request);
+                    } else {
+                        String sources = RequestTool.getString(request, "sources");
+
+                        MnpPhone mnpPhone = new MnpPhone();
+                        mnpPhone.setPhone(phone);               
+                        mnpPhone.setOperMnp(opermnp);
+                        mnpPhone.setOperOrg(operorg);
+                        mnpPhone.setSources(sources);
+
+                        if (dao.add(mnpPhone)) {                    
+                            message += "Thêm số thành công <br/>";     
+                            UserAction log = new UserAction(userlogin.getUserName(),
+                                "mnp_phones",
+                                UserAction.TYPE.ADD.val,
+                                UserAction.RESULT.SUCCESS.val,
+                                "Thêm số "+phone+" thành công!");
+                            log.logAction(request);
+                        } else {
+                            message += "Thêm số không thành công <br/>"; 
+                            UserAction log = new UserAction(userlogin.getUserName(),
+                                "mnp_phones",
+                                UserAction.TYPE.ADD.val,
+                                UserAction.RESULT.FAIL.val,
+                                "Thêm số "+phone+" không thành công!");
+                            log.logAction(request);
+                        }
+                    }
+                }
+                
+                session.setAttribute("mess", message);
+                response.sendRedirect(request.getContextPath() + "/admin/mnp_phone/index.jsp");
+                return;
+
+            }
+        %>
+        <div id="main_container">
+            <%@include file="/admin/includes/checkLogin.jsp" %>
+            <div class="main_content">
+                <%@include file="/admin/includes/menu.jsp" %>
+                <div class="center_content">
+                    <div class="right_content">
+                        <div align="center" style="margin-bottom: 2px; color: red;font-weight: bold">
+                            <%                                if (session.getAttribute("mess") != null) {
+                                    out.print(session.getAttribute("mess"));
+                                    session.removeAttribute("mess");
+                                }
+                            %>
+                        </div>
+                        <form action="" method="post">
+                            <table  align="center" id="rounded-corner">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="rounded-company"></th>
+                                        <th scope="col" class="rounded"></th>
+                                        <th style="font-weight: bold" scope="col" class="rounded redBoldUp">Thêm mới mnp phone</th>                                        
+                                        <th scope="col" class="rounded"></th>
+                                        <th scope="col" class="rounded-q4"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td></td>
+                                        <td align="left">Số điện thoại : </td>
+                                        <td colspan="2">
+                                            <input size="50" type="text" name="phone" value=""/>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>                                        
+                                        <td></td>
+                                        <td style="color: red">*Nhập số điện thoại theo ví dụ : </td>
+                                        <td style="color: red">VD 1: 0975034483. VD 2: 84975034483</td>
+                                        <td></td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td align="left">Nhà mạng chuyển tới:</td>
+                                        <td colspan="5">
+                                            <select style="width: 400px" name="opermnp" id="opermnp">
+                                                <option value="">***** Chọn nhà mạng *****</option>
+                                                <%
+                                                    ArrayList<Telco_Nations> allpro = Telco_Nations.getTelco_na();
+                                                    for (Telco_Nations one : allpro) {
+                                                %>
+                                                <option value="<%=one.getTelco_code()%>">
+                                                    [<%=one.getTelco_code()%>][<%=one.getTelco_name()%>] 
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td align="left">Nhà mạng ban đầu :</td>
+                                        <td colspan="5">
+                                            <select style="width: 400px" name="operorg" id="operorg">
+                                                <option value="">***** Chọn nhà mạng *****</option>
+                                                <%
+                                                    ArrayList<Telco_Nations> allpro1 = Telco_Nations.getTelco_na();
+                                                    for (Telco_Nations one : allpro1) {
+                                                %>
+                                                <option value="<%=one.getTelco_code()%>">
+                                                    [<%=one.getTelco_code()%>][<%=one.getTelco_name()%>] 
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td align="left">Nguồn : </td>
+                                        <td colspan="2">
+                                            <input readonly="true" size="50" type="text" name="sources" value="CMS"/>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="4" align="center">
+                                            <input class="button" type="submit" name="submit" value="Thêm mới"/>
+                                            <input class="button" onclick="window.location.href = '<%=request.getContextPath() + "/admin/mnp_phone/index.jsp"%>'" type="reset" name="reset" value="Hủy"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </form>
+                    </div><!-- end of right content-->
+                </div>   <!--end of center content -->
+                <div class="clear"></div>
+            </div> <!--end of main content-->
+            <%@include file="/admin/includes/footer.jsp" %>
+        </div>
+    </body>
+</html>

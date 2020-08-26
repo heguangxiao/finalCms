@@ -1,0 +1,367 @@
+<%@page import="gk.myname.vn.entity.UserAction"%>
+<%@page import="gk.myname.vn.entity.Telco_Nations"%>
+<%@page import="gk.myname.vn.entity.Nations"%>
+<%@page import="gk.myname.vn.entity.MsgBrandAds"%>
+<%@page import="gk.myname.vn.entity.Campaign"%>
+<%@page import="gk.myname.vn.entity.PartnerManager"%>
+<%@page import="gk.myname.vn.entity.Provider"%>
+<%@page import="gk.myname.vn.utils.DateProc"%>
+<%@page import="gk.myname.vn.utils.Tool"%>
+<%@page import="gk.myname.vn.config.MyContext"%>
+<%@page import="gk.myname.vn.utils.RequestTool"%>
+<%@page import="gk.myname.vn.entity.BrandLabel"%>
+<%@page import="java.util.Iterator"%>
+<%@page import="java.util.ArrayList"%>
+<%@page contentType="text/html; charset=utf-8" %>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html >
+    <head>
+        <%@include file="/admin/includes/header.jsp" %>
+        <script type="text/javascript" language="javascript">
+            var now = new Date();
+            var month = now.getUTCMonth()-2;
+            var year = now.getUTCFullYear();
+            var str = year + '/' + month + '/' + 1;
+            $(document).ready(function () {
+                $('#example').DataTable({
+                    "order": [[0, "DESC"]],
+                    "bPaginate": false,
+                    "bLengthChange": false,
+                    "bFilter": true,
+                    "bInfo": false,
+                    "bAutoWidth": false
+                });
+            });
+            $(document).ready(function () {
+                $('.dateproc').datetimepicker({
+                    lang: 'vi',
+                    timepicker: false,
+                    format: 'd/m/Y',
+                    formatDate: 'Y/m/d',
+                    minDate: str, // yesterday is minimum date
+                    maxDate: '+1970/01/02' // and tommorow is maximum date calendar
+                });
+            });
+            //------
+            function validMonth() {
+                var stRequest = $("#stRequest").val();
+                var endRequest = $("#endRequest").val();
+                var arrstRequest = stRequest.split("/");
+                var arrendRequest = endRequest.split("/");
+                if (stRequest !== "" && stRequest !== null) {
+                    if (arrstRequest[1] !== arrendRequest[1]) {
+                        jAlert("Bạn chỉ thống kê được dữ liệu từng tháng...");
+                        return false;
+                    }
+                    if (arrstRequest[2] !== arrendRequest[2]) {
+                        jAlert("Năm bạn chọn không hợp lệ...");
+                        return false;
+                    }
+                }
+            }
+            function changeCP() {
+                var selectBr = $("#_userSender option:selected");
+                var user = selectBr.val();
+                if (user !== "") {
+                    var url = "<%=request.getContextPath()%>/admin/statistic/ajax/listBrand.jsp?user=" + user;
+                    url += "&_=" + Math.floor(Math.random() * 10000);
+                    AjaxAction(url, "_label");
+                } else {
+                    var url = "<%=request.getContextPath()%>/admin/statistic/ajax/listBrand.jsp?user=user";
+                    url += "&_=" + Math.floor(Math.random() * 10000);
+                    AjaxAction(url, "_label");
+                }
+                $("#_label").select2("val", "");
+            }
+                        
+            function changeBrand() {
+                var selectBr = $("#_label option:selected");
+                var user = selectBr.attr("user_owner");
+                if (selectBr.val() !== "") {                    
+                    document.getElementById('_agentcy_id').disabled = true;
+                    $("#_userSender").select2('val', user);                   
+                } else {
+                    document.getElementById('_agentcy_id').disabled = false;
+                    $("#_userSender").select2('val', user);
+                }
+            }
+            
+            function changeTelco(i) {
+                var url = "<%=request.getContextPath()%>/admin/statistic/ajax/listTelco.jsp?code=" + i;
+                AjaxAction(url, "oper");
+            }
+        </script>
+    </head>
+    <body>
+        <%            //-
+                           
+            if (!userlogin.checkView(request)) {
+                //CongNX: Ghi log action vao db
+                UserAction log = new UserAction(userlogin.getUserName(),
+                        UserAction.TABLE.campaign.val,
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.REJECT.val,
+                        "Permit deny!");
+                log.logAction(request);
+                //CongNX: ket thuc ghi log db voi action thao tac tu web
+                session.setAttribute("mess", "Bạn không có quyền thêm module này!");
+                response.sendRedirect(request.getContextPath() + "/admin/login.jsp");
+                return;
+            }
+            
+            MsgBrandAds msgDao = new MsgBrandAds();
+            String startTime = RequestTool.getString(request, "stRequest");
+            if (Tool.checkNull(startTime)) {
+                startTime = DateProc.createDDMMYYYY_Start01();
+            }
+            String endTime = RequestTool.getString(request, "endRequest");
+            if (Tool.checkNull(endTime)) {
+                endTime = DateProc.createDDMMYYYY_Start01();
+            }
+            
+            int bid = RequestTool.getInt(request, "_label");
+            BrandLabel brLabel = BrandLabel.getFromCache(bid);
+            //--
+            String label = "";
+            if (brLabel != null) {
+                label = brLabel.getBrandLabel();
+            }
+            
+            String userSender = RequestTool.getString(request, "userSender");
+            String result = RequestTool.getString(request, "result");
+            String oper = RequestTool.getString(request, "oper");
+            String nation = RequestTool.getString(request, "nation");
+            String cp_code = RequestTool.getString(request, "cp_code");
+                        
+            ArrayList<MsgBrandAds> allLog = msgDao.staticAll(startTime, endTime, result, userSender, label, oper, nation, cp_code);
+            
+            String urlExport = request.getContextPath() + "/admin/campaign/exp/export_tk_CDR.jsp?";
+            
+            urlExport += "&startTime=" + startTime;
+            urlExport += "&endTime=" + endTime;
+            urlExport += "&result=" + result;
+            urlExport += "&userSender=" + userSender;
+            urlExport += "&label=" + label;
+            urlExport += "&oper=" + oper;
+            urlExport += "&nation=" + nation;
+            urlExport += "&cp_code=" + cp_code;
+        %>
+        <div id="main_container">
+            <%@include file="/admin/includes/checkLogin.jsp" %>
+            <div class="main_content">
+                <%@include file="/admin/includes/menu.jsp" %>
+                <div class="center_content">
+                    <div class="right_content">
+                        <!-- Tìm kiếm-->
+                        <form onsubmit="return validMonth();" action="<%=request.getContextPath() + "/admin/campaign/thongke_qc.jsp"%>" method="post">
+                            <table id="rounded-corner" align="center">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="rounded-company"></th>
+                                        <th scope="col" class="rounded"></th>
+                                        <th scope="col" class="rounded-q4">Thống kê TIN QUẢNG CÁO</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Từ ngày</span></td>
+                                        <td> 
+                                            <input value="<%=startTime%>" id="stRequest" class="dateproc" style="width: 160px" type="text" name="stRequest"/>
+                                            &nbsp;&nbsp;
+                                            <span class="redBold">Đến</span>
+                                            <input value="<%=endTime%>" id="endRequest" class="dateproc" style="width: 160px" type="text" name="endRequest"/>
+                                            &nbsp;&nbsp;
+                                            <span class="redBold">Kết Quả</span>
+                                            <select class="select3" style="width: 175px" id="result" name="result">
+                                                <option value="">Tất Cả</option>
+                                                <option <%=result.equals("1") ? "selected='selected'" : ""%> value="1">Thành Công</option>
+                                                <option <%=result.equals("0") ? "selected='selected'" : ""%> value="0">Thất bại</option>
+                                            </select>
+                                        </td>
+                                    </tr>     
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Nation</span>  </td>
+                                        <td>                                          
+                                            <select onchange="changeTelco(this.value)" class="select3" style="width: 400px" id="nation" name="nation">
+                                                <option value="">Tất cả</option>
+                                                <% 
+                                                    ArrayList<Nations> nations = Nations.getAll();
+                                                    for (Nations elem : nations) {
+                                                %>
+                                                <option <%=nation.equalsIgnoreCase(elem.getCountry_code()) ? "selected='selected'" : ""%> value="<%=elem.getCountry_code()%>">[<%=elem.getCountry_code()%>] <%=elem.getCountry_name()%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                            <span class="redBold">Telco</span>                                            
+                                            <select class="select3" style="width: 400px; float: right" id="oper" name="oper">
+                                                <option value="">Tất cả</option>
+                                                <%
+                                                    ArrayList<Telco_Nations> telco_Nations = Telco_Nations.getTelco_na();
+                                                    for (Telco_Nations elem : telco_Nations) {                                                            
+                                                %>
+                                                <option <%=oper.equalsIgnoreCase(elem.getTelco_code()) ? "selected='selected'" : ""%> value="<%=elem.getTelco_code()%>">[<%=elem.getCountry_code()%>] <%=elem.getTelco_name()%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>  
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Nhãn gửi</span></td>
+                                        <td>
+                                            <select onchange="changeBrand()" style="width: 400px" id="_label" name="_label">
+                                                <option brand_id="" user_owner="" value="" img-data="">Tất cả</option>
+                                                <%
+                                                    ArrayList<BrandLabel> allLabel = BrandLabel.getAll();
+                                                    for (BrandLabel one : allLabel) {
+                                                %>
+                                                <option user_owner="<%=one.getUserOwner()%>" 
+                                                        <%=bid == one.getId() ? "selected='selected'" : ""%> 
+                                                        value="<%=one.getId()%>"
+                                                        img-data="<%=(one.getStatus() == 1 ? "" : request.getContextPath()+ "/admin/resource/images/lock1.png")%>" >
+                                                    <%=one.getBrandLabel()%> [<%=one.getUserOwner()%>]
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>                                            
+                                            <span class="redBold">Đại lý</span>                                            
+                                            <%
+                                                ArrayList<PartnerManager> allAgentCy = PartnerManager.getAllCache();
+                                                if (allAgentCy != null && !allAgentCy.isEmpty()) {
+                                            %>
+                                            <select onchange="changeDL()" style="width: 400px; float: right" id="_agentcy_id" name="cp_code">
+                                                <option value="" >Tất cả</option>
+                                                <%
+                                                    for (PartnerManager onePartner : allAgentCy) {
+                                                        if (!Tool.checkNull(onePartner.getCode())) {
+                                                %>
+                                                <option <%=(cp_code.equals(onePartner.getCode())) ? "selected='selected'" : ""%> 
+                                                    value="<%=onePartner.getCode()%>"
+                                                    img-data="<%=(onePartner.getStatus() == 1 ? "" : request.getContextPath()+ "/admin/resource/images/lock1.png")%>" >[<%=onePartner.getCode()%>] <%=onePartner.getName()%></option>
+                                                <% }
+                                                        }
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>                             
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Khách Hàng</span></td>
+                                        <td>
+                                            <%
+                                                ArrayList<Account> allCp = Account.getAllCP();
+                                                if (allCp != null && !allCp.isEmpty()) {
+                                            %>
+                                            <select style="width: 400px" onchange="changeCP()" id="_userSender" name="userSender">
+                                                <option value="">--- Tất cả ---</option>
+                                                <%
+                                                    for (Account oneAcc : allCp) {
+                                                %>
+                                                <option <%=(oneAcc.getUserName().equals(userSender)) ? "selected ='selected'" : ""%>
+                                                    value="<%=oneAcc.getUserName()%>"
+                                                    img-data="<%=(oneAcc.getStatus() == 1 ? "" : request.getContextPath() +"/admin/resource/images/lock1.png")%>" >[<%=oneAcc.getUserName()%>] <%=oneAcc.getFullName()%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                            <%
+                                                }
+                                            %>
+                                        </td>
+                                    </tr>
+                                    <tr align="center">
+                                        <td colspan="3">
+                                            <input class="button" type="submit" name="submit" value="Thống kê"/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;
+                                            <input onclick="window.open('<%=urlExport%>')" class="button" type="button" name="button" value="Xuất Excel"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </form>      
+                        <!--End tim kiếm-->
+                        <div align="center" style="height: 20px;margin-bottom: 2px; color: red;font-weight: bold">
+                            <%                                
+                                if (session.getAttribute("mess") != null) {
+                                    out.print(session.getAttribute("mess"));
+                                    session.removeAttribute("mess");
+                                }
+                            %>
+                        </div>
+                        <!--Content-->
+                        <table id="example" class="display" cellspacing="0" width="100%">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="rounded-company Bold">CP CODE</th>
+                                    <th scope="col" class="rounded Bold">Brand Name</th>
+                                    <th scope="col" class="rounded Bold">User</th>
+                                    <th scope="col" class="rounded Bold">Mạng</th>
+                                    <th scope="col" class="rounded Bold">Tổng tin</th>
+                                    <th scope="col" class="rounded Bold">Ngày gửi</th>
+                                    <th scope="col" class="rounded Bold">Kết quả</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <%
+                                    int total = 0;
+                                    int total2 = 0;
+                                    for (Iterator<MsgBrandAds> iter = allLog.iterator(); iter.hasNext();) {
+                                        MsgBrandAds oneBrand = iter.next();
+                                        if (oneBrand.getResult().equals("1")) {
+                                            total += oneBrand.getTotalMsg();
+                                        } else {
+                                            total2 += oneBrand.getTotalMsg();
+                                        }
+                                %>
+                                <tr>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getCpCode()%>
+                                    </td>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getLabel()%>
+                                    </td>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getUserSender()%>
+                                    </td>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getOper()%>
+                                    </td>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getTotalMsg()%>
+                                    </td>
+                                    <td class="boder_right">
+                                        <%=oneBrand.getTimeSend()%>
+                                    </td>
+                                    <td>
+                                        <span class="redBold"><%=oneBrand.getResult()%></span> &nbsp;(<%=oneBrand.getResult().equals("1") ? "SUCCESS" : "ERROR"%>)
+                                    </td>
+                                </tr>
+                                <%
+                                    }
+                                %>
+                            </tbody>
+                        </table>
+                        <table id="rounded-corner">
+                            <tr>
+                                <td class="boder_right" colspan="3" style="font-weight: bold;color: blue;width: 352px">Tổng MT thành công</td>
+                                <td colspan="5" style="font-weight: bold;color: blue" align="left"><%=total%></td>
+                            </tr>
+                            <tr>
+                                <td class="boder_right" colspan="3" style="font-weight: bold;color: blue;width: 352px">Tổng MT thất bại</td>
+                                <td colspan="5" style="font-weight: bold;color: blue" align="left"><%=total2%></td>
+                            </tr>
+                        </table>
+                    </div><!-- end of right content-->
+                </div>   <!--end of center content -->
+                <div class="clear"></div>
+            </div> <!--end of main content-->
+            <%@include file="/admin/includes/footer.jsp" %>
+        </div>
+    </body>
+</html>

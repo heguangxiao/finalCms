@@ -1,0 +1,130 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package gk.myname.vn.entity;
+
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import gk.myname.vn.utils.Tool;
+import java.io.IOException;
+import org.apache.log4j.Logger;
+
+/**
+ *
+ * @author @author LienHoa(CongNX)
+ */
+public class CustodyMessage {
+    static final Logger logger = Logger.getLogger(CustodyMessage.class);
+    static final ObjectMapper mapper = new ObjectMapper();
+    
+    //Thong so chung
+    String userapi;
+    String keyapi;
+    String command;
+    
+    //Thong so rieng
+    String username;
+    String brandname;
+    String telcosms;//Danh sach mang va so luong tin nhan cua mang do VTE:11;VMS:98;VNP:65
+    String messageid;//Campagin id
+    String typecharg;//CSKH hay QC
+
+    public CustodyMessage() {
+    }
+
+    public String getUserapi() {
+        return userapi;
+    }
+
+    public void setUserapi(String userapi) {
+        this.userapi = userapi;
+    }
+
+    public String getKeyapi() {
+        return keyapi;
+    }
+
+    public void setKeyapi(String keyapi) {
+        this.keyapi = keyapi;
+    }
+
+    public String getCommand() {
+        return command;
+    }
+
+    public void setCommand(String command) {
+        this.command = command;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    
+
+    public String getBrandname() {
+        return brandname;
+    }
+
+    public void setBrandname(String brandname) {
+        this.brandname = brandname;
+    }
+
+    public String getTelcosms() {
+        return telcosms;
+    }
+
+    public void setTelcosms(String telcosms) {
+        this.telcosms = telcosms;
+    }
+
+    
+
+    public String getMessageid() {
+        return messageid;
+    }
+
+    public void setMessageid(String messageid) {
+        this.messageid = messageid;
+    }
+
+    public String getTypecharg() {
+        return typecharg;
+    }
+
+    public void setTypecharg(String typecharg) {
+        this.typecharg = typecharg;
+    }
+    
+    
+    
+    
+    public String toJsonStr() {
+        try {
+            mapper.getFactory().configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, true);
+            String jsonInString = mapper.writeValueAsString(this);
+            return jsonInString;
+        } catch (JsonProcessingException e) {
+            logger.error(Tool.getLogMessage(e));
+            return "Error " + this.getClass().getName() + " Json Object:" + e.getMessage();
+        }
+    }
+    
+    public static CustodyMessage toObject(String jsonStr) {
+        CustodyMessage result = null;
+        try {
+            mapper.getFactory().configure(JsonGenerator.Feature.ESCAPE_NON_ASCII, true);
+            result = mapper.readValue(jsonStr, CustodyMessage.class);
+        } catch (IOException e) {
+            logger.error(Tool.getLogMessage(e));
+        }
+        return result;
+    }
+}

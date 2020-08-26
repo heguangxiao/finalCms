@@ -1,0 +1,607 @@
+<%@page import="gk.myname.vn.utils.RequestTool"%>
+<%@page import="gk.myname.vn.entity.Template_sms"%>
+<%@page import="gk.myname.vn.entity.RouteNationTelco"%>
+<%@page import="gk.myname.vn.entity.GroupProvider"%>
+<%@page import="gk.myname.vn.entity.Provider"%>
+<%@page import="gk.myname.vn.entity.Telco_Nations"%>
+<%@page import="gk.myname.vn.entity.BrandLabel"%>
+<%@page import="gk.myname.vn.entity.UserAction"%>
+<%@page contentType="text/html; charset=utf-8" %>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+    <head>
+        <%@include file="/admin/includes/header.jsp" %>
+        <link rel="stylesheet" type="text/css" href="<%=request.getContextPath()%>/admin/resource/css/jquery-ui-1.8.16.custom.css">
+        <script language="javascript" type="text/javascript" src="<%=request.getContextPath()%>/admin/resource/js/suggest/jquery.ui.core.min.js"></script>
+        <script language="javascript" type="text/javascript" src="<%=request.getContextPath()%>/admin/resource/js/suggest/jquery.ui.position.min.js"></script>
+        <script language="javascript" type="text/javascript" src="<%=request.getContextPath()%>/admin/resource/js/suggest/jquery.ui.widget.min.js"></script>
+        <script language="javascript" type="text/javascript" src="<%=request.getContextPath()%>/admin/resource/js/suggest/jquery.ui.autocomplete.min.js"></script>
+        <script type="text/javascript" language="javascript">
+            var now = new Date();
+            var day = now.getUTCDate();
+            var month = now.getUTCMonth()+1;
+            var year = now.getUTCFullYear();
+            var str = year + '/' + month + '/' + day;
+            $(document).ready(function () {
+                $('.dateproc').datetimepicker({
+                    lang: 'vi',
+                    timepicker: false,
+                    format: 'd/m/Y',
+                    formatDate: 'Y/m/d',
+                    minDate: str
+                });           
+            });
+        </script>
+        <SCRIPT language="javascript">
+            function show(num) {
+                let nm = parseInt(num);//7
+                let n = nm - 1;//6
+                let nu = 1 + nm;//8
+                for (let el of document.querySelectorAll('.trdtgt'+num)) el.style.display = '';
+                document.getElementById('show'+num).style.display = 'none';
+                document.getElementById('hide'+num).style.display = '';                
+                document.getElementById('numb').value = num;
+                if (nm > 1) {
+                    document.getElementById('hide'+n).style.display = 'none';
+                }
+                if (nm < 7) {
+                    document.getElementById('show'+nu).style.display = '';
+                }
+            }
+
+            function hide(num) {
+                let nm = parseInt(num);//1
+                let n = nm - 1;//0
+                let nu = 1 + nm;//8
+                for (let el of document.querySelectorAll('.trdtgt'+num)) el.style.display = 'none';
+                document.getElementById('show'+num).style.display = '';
+                document.getElementById('hide'+num).style.display = 'none';
+                document.getElementById('numb').value = n;
+                if (nm > 1) {
+                    document.getElementById('hide'+n).style.display = '';
+                }
+                if (nm < 7) {
+                    document.getElementById('show'+nu).style.display = 'none';
+                }
+            }
+        </SCRIPT>
+    </head>
+
+    <body>
+        <%  //--          
+            if (!userlogin.checkAdd(request)) {
+                //CongNX: Ghi log action vao db
+                UserAction log = new UserAction(userlogin.getUserName(),
+                        UserAction.TABLE.brand_label.val,
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.REJECT.val,
+                        "Permit deny!");
+                log.logAction(request);
+                //CongNX: ket thuc ghi log db voi action thao tac tu web
+                session.setAttribute("mess", "Bạn không có quyền thêm module này!");
+                response.sendRedirect(request.getContextPath() + "/admin/brand-declare/index.jsp");
+                return;
+            }
+            
+            BrandLabel oneBrand = null;
+            ArrayList<BrandLabel> allLabelDao = BrandLabel.getAll();
+            ArrayList<BrandLabel> allLabel = new ArrayList<>();
+            String check = "";
+            for (BrandLabel elem : allLabelDao) {
+                    if (!check.contains(elem.getBrandLabel())) {
+                        check += elem.getBrandLabel();
+                        allLabel.add(elem);
+                    }
+                }
+            int owner_id = Tool.string2Integer(request.getParameter("owner_id"), 0);
+            String message = "";
+                        
+            if (request.getParameter("submit") != null) {
+                if (owner_id == 0) {
+                    session.setAttribute("mess", "Bạn chưa chọn Account");
+                    response.sendRedirect(request.getContextPath() + "/admin/brand-declare/add.jsp");
+                    return;
+                }
+                String telco;
+                int duplicate;
+                String cskh;
+                String qc;
+                String group;
+                int rq;
+                int stt;
+                String tmpid;
+                String lbid;
+                String lbusername;
+                String cskhunicode;
+                String groupunicode;
+                int denhan;
+                int ckdenhan;
+                int numb = Tool.string2Integer(request.getParameter("numb"));
+                int id_template;
+                
+                
+                String brandName = Tool.validStringRequest(request.getParameter("brandName"));
+                String stRequest = RequestTool.getString(request, "stRequest");
+                int type = Tool.string2Integer(request.getParameter("cktype"));
+                
+                if (brandName.equals("")) {
+                    UserAction log = new UserAction(userlogin.getUserName(),
+                    UserAction.TABLE.brand_label.val,
+                    UserAction.TYPE.ADD.val,
+                    UserAction.RESULT.FAIL.val,
+                    "No brand name entered!");
+                    log.logAction(request);
+                    session.setAttribute("mess", "Bạn chưa nhập brandname");
+                    response.sendRedirect(request.getContextPath() + "/admin/brand-declare/add.jsp");
+                    return;
+                }
+                
+                    if (brandName.length() > 15) {
+                        UserAction log = new UserAction(userlogin.getUserName(),
+                        UserAction.TABLE.brand_label.val,
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.FAIL.val,
+                        "Brand Name có đọ dài tối đa = 15!");
+                        log.logAction(request);
+                        session.setAttribute("mess", "Brand Name có đọ dài tối đa = 15!");
+                        response.sendRedirect(request.getContextPath() + "/admin/brand-declare/add.jsp");
+                        return;
+                    }
+                
+                    if (Tool.stringIsSpace(brandName)) {
+                        UserAction log = new UserAction(userlogin.getUserName(),
+                        UserAction.TABLE.brand_label.val,
+                        UserAction.TYPE.ADD.val,
+                        UserAction.RESULT.FAIL.val,
+                        "Brand Name không được có khoản trắng (space)!");
+                        log.logAction(request);
+                        session.setAttribute("mess", "Brand Name không được có khoản trắng (space)!");
+                        response.sendRedirect(request.getContextPath() + "/admin/brand-declare/add.jsp");
+                        return;
+                    }
+                
+                int priority = Tool.string2Integer(request.getParameter("priority"));
+                int status = Tool.string2Integer(request.getParameter("status"));
+                int checktemp = Tool.string2Integer(request.getParameter("checktemp"));
+                Account accOwner = Account.getAccount(owner_id);
+                
+                oneBrand = new BrandLabel();
+                oneBrand.setBrandLabel(brandName);
+                oneBrand.setUserOwner(accOwner.getUserName());  
+                oneBrand.setCp_code(accOwner.getCpCode());                  
+                oneBrand.setCreateBy(userlogin.getAccID());
+                oneBrand.setStatus(status);
+                oneBrand.setPriority(priority);
+                oneBrand.setCheckTemp(checktemp);
+                oneBrand.setType(type);
+                oneBrand.setExp(stRequest);
+                
+                BrandLabel brandDao = new BrandLabel();
+                RouteNationTelco rntDao = new RouteNationTelco();
+                RouteNationTelco rnt = null;
+                if (brandDao.addNew(oneBrand)) {
+                    message += "Thêm mới Brand " + brandName + " thành công<br/>";
+                    
+                    UserAction log = new UserAction(userlogin.getUserName(),
+                            UserAction.TABLE.brand_label.val,
+                            UserAction.TYPE.ADD.val,
+                            UserAction.RESULT.SUCCESS.val,
+                            "Brandname " + brandName + " with account(" + accOwner.getUserName() + ")!");
+                    log.logAction(request);                    
+                    for (int i = 1; i < (numb + 1); i++) {
+                        telco = Tool.validStringRequest(request.getParameter("telco"+i));
+                        if (!telco.equals("")) {
+                            rnt = rntDao.getbyBrandnameAndUserownerAndTelco(brandName, accOwner.getUserName(), telco);
+                            if (rnt == null) {
+                                duplicate = Tool.string2Integer(request.getParameter("duplicate"+i));
+                                cskh = Tool.validStringRequest(request.getParameter("cskh"+i));
+                                qc = Tool.validStringRequest(request.getParameter("qc"+i));
+                                group = Tool.validStringRequest(request.getParameter("group"+i));
+                                tmpid = Tool.validStringRequest(request.getParameter("tmpid"+i));
+                                lbid = Tool.validStringRequest(request.getParameter("lbid"+i));
+                                lbusername = Tool.validStringRequest(request.getParameter("lbusername"+i));
+                                cskhunicode = Tool.validStringRequest(request.getParameter("cskhunicode"+i));
+                                groupunicode = Tool.validStringRequest(request.getParameter("groupunicode"+i));
+                                denhan = Tool.string2Integer(request.getParameter("denhan"+i));
+                                stt = Tool.string2Integer(request.getParameter("stt"+i));
+                                rq = Tool.string2Integer(request.getParameter("rq"+i));
+                                ckdenhan = Tool.string2Integer(request.getParameter("ckdenhan"+i));
+                                id_template = Tool.string2Integer(request.getParameter("id_template"+i));
+
+                                rnt = new RouteNationTelco();
+                                rnt.setTelcoCode(telco);
+                                rnt.setDuplicate(duplicate);
+                                rnt.setCskh(cskh);
+                                rnt.setQc(qc);
+                                rnt.setGroup(group);
+                                rnt.setTempId(tmpid);
+                                rnt.setLabelId(lbid);
+                                rnt.setLabelUsername(lbusername);
+                                rnt.setRequest(rq);
+                                rnt.setStatus(stt);
+                                rnt.setBrandname(brandName);
+                                rnt.setUser_owner(accOwner.getUserName());
+                                rnt.setCskhunicode(cskhunicode);
+                                rnt.setGroupunicode(groupunicode);
+                                rnt.setDenhan(denhan);
+                                rnt.setCkdenhan(ckdenhan);
+                                rnt.setTemplateId(id_template);
+
+                                if (rntDao.addRouteNationTelco(rnt)) {
+//                                    message += "Thêm mới mạng " + telco + " thành công<br/>";
+                                    
+                                    log = new UserAction(userlogin.getUserName(),
+                                    "route_nation_telco",
+                                    UserAction.TYPE.ADD.val,
+                                    UserAction.RESULT.SUCCESS.val,
+                                    "Thêm mới mạng " + telco + " thành công!");
+                                    log.logAction(request);
+                                } else {
+//                                    message += "Thêm mới mạng " + telco + " lỗi<br/>";
+                                    
+                                    log = new UserAction(userlogin.getUserName(),
+                                    "route_nation_telco",
+                                    UserAction.TYPE.ADD.val,
+                                    UserAction.RESULT.FAIL.val,
+                                    "Thêm mới mạng " + telco + " lỗi!");
+                                    log.logAction(request);
+                                }
+                            } else {
+//                                message += "Mạng " + telco + " của brand " + brandName + " đã tồn tại<br/>";
+                                log = new UserAction(userlogin.getUserName(),
+                                "route_nation_telco",
+                                UserAction.TYPE.ADD.val,
+                                UserAction.RESULT.FAIL.val,
+                                "Mạng " + telco + " của brand " + brandName + " đã tồn tại!");
+                                log.logAction(request);
+                            }
+                        }
+                    }
+                    session.setAttribute("mess", message);
+                    
+                    if (oneBrand.getStatus() == 1) {
+                        response.sendRedirect(request.getContextPath() + "/admin/brand/index.jsp");
+                        return;
+                    }
+                    
+                    response.sendRedirect(request.getContextPath() + "/admin/brand-declare/index.jsp");
+                    return;
+                } else {
+                    //CongNX: Ghi log action vao db
+                    UserAction log = new UserAction(userlogin.getUserName(),
+                            UserAction.TABLE.brand_label.val,
+                            UserAction.TYPE.ADD.val,
+                            UserAction.RESULT.FAIL.val,
+                            "Brandname " + brandName + " with account(" + accOwner.getUserName() + ")!");
+                    log.logAction(request);
+                    //CongNX: ket thuc ghi log db voi action thao tac tu web
+                    session.setAttribute("mess", "Thêm mới dữ liệu lỗi!");
+                    response.sendRedirect(request.getContextPath() + "/admin/brand-declare/add.jsp");
+                    return;
+                }
+            }
+        %>
+        <div id="main_container">
+            <%@include file="/admin/includes/checkLogin.jsp" %>
+            <div class="main_content">
+                <%@include file="/admin/includes/menu.jsp" %>
+                <div class="center_content">
+                    <div class="right_content">
+                        <div align="center" style="height: 20px;margin-bottom: 2px; color: red;font-weight: bold">
+                            <%                                
+                                if (session.getAttribute("mess") != null) {
+                                    out.print(session.getAttribute("mess"));
+                                    session.removeAttribute("mess");
+                                }
+                            %>
+                        </div>
+                        <form action="" method="post">
+                            <table  align="center" id="rounded-corner">
+                                <thead>
+                                    <tr>
+                                        <th colspan="1" class="rounded-company"></th>
+                                        <th colspan="10" class="redBoldUp">Thêm mới Brand [DEV]</th>
+                                        <th colspan="1" class="rounded-q4"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td colspan="2" align="left">Brand Name</td>
+                                        <td class="boder_right" colspan="2">
+                                            <input size="10" type="text" name="brandName" id="brandName"/>
+                                        </td>
+                                        <td colspan="2" align="left">Account</td>
+                                        <td colspan="3" align="left">
+                                            <select class="select3" name="owner_id" id="owner_id">
+                                                <option value="0">-- Chọn tài khoản Sở hữu --</option>
+                                                <%
+                                                    ArrayList<Account> allCp = Account.getAllCP();
+                                                    for (Account one : allCp) {
+                                                        if (one.getStatus() != Account.STATUS.ACTIVE.val) {
+                                                            continue;
+                                                        };
+                                                %>
+                                                <option <%=(owner_id == one.getAccID() ? "selected='selected'" : "")%> 
+                                                    value="<%=one.getAccID()%>" 
+                                                    img-data="<%=(one.getStatus() == 1 ? "" : "/admin/resource/images/lock1.png")%>" > [<%=one.getUserName()%>] <%=one.getFullName()%> </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                        <td colspan="3" align="left"></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" align="left"></td>
+                                        <td class="boder_right" colspan="2">                                            
+                                            <input onclick="checkBoxClick(this);" type="checkbox" name="cktype" value="0"/> LONGCODE <br/>
+                                        </td>
+                                        <td colspan="2" align="left">Hết hạn</td>
+                                        <td colspan="3" align="left">
+                                            <input readonly class="dateproc" size="8" id="stRequest" type="text" name="stRequest"/>
+                                        </td>
+                                        <td colspan="3" align="left"></td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" align="left">Mức độ ưu tiên</td>
+                                        <td class="boder_right" colspan="2" align="left"> 
+                                            <select name="priority">
+                                                <option value="1">Cấp độ 1</option>
+                                                <option value="2">Cấp độ 2</option>
+                                                <option value="3">Cấp độ 3</option>
+                                                <option value="4">Cấp độ 4</option>
+                                            </select>
+                                        </td>
+                                        <td colspan="2" align="left">
+                                            Trạng thái
+                                        </td>
+                                        <td colspan="2" align="left">
+                                            <select name="status">
+                                                <option value="2">Chờ kích hoạt</option>
+                                                <option value="1">Kích hoạt</option>
+                                            </select>
+                                        </td>
+                                        <td colspan="1" align="left">
+                                            Check Temp
+                                        </td>
+                                        <td colspan="1" align="left">
+                                            <select name="checktemp">
+                                                <option  value="1">Có</option>
+                                                <option  value="0">Không</option>
+                                            </select>
+                                        </td>
+                                        <td colspan="2" align="left"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="background: #60c8f2 none repeat" class="redBoldUp" colspan="1"></td>
+                                        <td style="background: #60c8f2 none repeat" class="redBoldUp" colspan="11">ĐỊNH TUYẾN GỬI TIN</td>
+                                    </tr>
+                                    <tr>
+                                        <td align="center" class="boder_right" colspan="2"><b>Mạng</b></td>
+                                        <td align="center" class="boder_right" colspan="2"><b>CSKH(Mặc định)</b></td>
+                                        <td align="center" class="boder_right" colspan="2"><b>CSKH(Unicode)</b></td>
+                                        <td align="center" class="boder_right" colspan="2"><b>Đè nhãn</b></td>
+                                        <td align="center" colspan="2"><b>Y/c thêm của Ncc</b></td>
+                                        <td align="center" colspan="2">
+                                        </td>
+                                    </tr>
+                                    <% 
+                                        for (int i = 1; i < 8; i++) {
+                                    %>
+                                    <tr class="trdtgt<%=i%>" style="display: none">
+                                        <td align="center" class="boder_right" colspan="2">
+                                            <select style="width: 150px" class="select3" name="telco<%=i%>" id="telco<%=i%>">
+                                                <option value="">-- Chọn mạng --</option>
+                                                <%
+                                                    ArrayList<Telco_Nations> allT = Telco_Nations.getTelco_na();
+                                                    for (Telco_Nations one : allT) {
+                                                %>
+                                                <option value="<%=one.getTelco_code()%>" > [<%=one.getCountry_code()%>] <%=one.getTelco_name()%> </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                            <select style="width: 150px" class="select3" name="stt<%=i%>" >
+                                                <option value="1">Kích hoạt</option>
+                                                <option value="0">Khóa</option>
+                                                <option value="2">Chờ kích hoạt</option>
+                                                <option value="3">Đang kích hoạt</option>
+                                            </select>
+                                            <select style="width: 150px" class="select3" name="duplicate<%=i%>">
+                                                <option value="0">Chặn trùng</option>
+                                                <option value="1">Không chặn</option>
+                                            </select>
+                                            <select style="width: 150px" class="select3" name="group<%=i%>">
+                                                <option value="0">NHÓM</option>
+                                                <option value="N1">N1</option>
+                                                <option value="N2">N2</option>
+                                                <option value="N3">N3</option>
+                                                <option value="N4">N4</option>
+                                                <option value="N5">N5</option>
+                                                <option value="N6">N6</option>
+                                                <option value="N7">N7</option>
+                                                <option value="N8">N8</option>
+                                                <option value="N9">N9</option>
+                                                <option value="N10">N10</option>
+                                                <option value="N11">N11</option>
+                                                <option value="N12">N12</option>
+                                                <option value="N13">N13</option>
+                                                <option value="N14">N14</option>
+                                                <option value="N15">N15</option>
+                                                <option value="NLC">NLC</option>
+                                            </select>
+                                        </td>
+                                        <td align="center" class="boder_right" colspan="2">
+                                            <select style="width: 150px" class="select3" name="cskh<%=i%>" id="cskh<%=i%>">
+                                                <option value="0">Không cho Phép</option>
+                                                <%
+                                                    for (Provider one : Provider.CACHE) {
+                                                        out.print("<option value='" + one.getCode() + " '>" + one.getName() + "</option>");
+                                                    }
+                                                %>
+                                                <%
+                                                    for (GroupProvider one : GroupProvider.CACHE) {
+                                                        out.print("<option value='" + (one.getId()+"GROUP")+ " '>[GROUP] -- " + one.getName() + " -- [NHÓM]</option>");
+                                                    }
+                                                %>
+                                            </select>
+                                            <br/>
+                                            <input onclick="checkBoxClick(this);" type="checkbox" name="rq<%=i%>" value="0"/>Tính 1 tin
+                                        </td>
+                                        <td align="center" class="boder_right" colspan="2">
+                                            <select style="width: 150px" class="select3" name="cskhunicode<%=i%>">
+                                                <option value="0">Không cho Phép</option>
+                                                <%
+                                                    for (Provider one : Provider.CACHE) {
+                                                        out.print("<option value='" + one.getCode() + " '>" + one.getName() + "</option>");
+                                                    }
+                                                %>
+                                                <%
+                                                    for (GroupProvider one : GroupProvider.CACHE) {
+                                                        out.print("<option value='" + (one.getId()+"GROUP")+ " '>[GROUP] -- " + one.getName() + " -- [NHÓM]</option>");
+                                                    }
+                                                %>
+                                            </select>
+                                            <br/>
+                                            <select style="display: none;width: 78px;float: left" class="select3" name="groupunicode<%=i%>">
+                                                <option value="0">NHÓM</option>
+                                                <option value="N1">N1</option>
+                                                <option value="N2">N2</option>
+                                                <option value="N3">N3</option>
+                                                <option value="N4">N4</option>
+                                                <option value="N5">N5</option>
+                                                <option value="N6">N6</option>
+                                                <option value="N7">N7</option>
+                                                <option value="N8">N8</option>
+                                                <option value="N9">N9</option>
+                                                <option value="N10">N10</option>
+                                                <option value="N11">N11</option>
+                                                <option value="N12">N12</option>
+                                                <option value="N13">N13</option>
+                                                <option value="N14">N14</option>
+                                                <option value="N15">N15</option>
+                                                <option value="NLC">NLC</option>
+                                            </select>
+                                        </td>
+                                        <td align="left" class="boder_right" colspan="2">
+                                            <input onclick="checkBoxClick(this);" type="checkbox" name="ckdenhan<%=i%>" value="0"/> Có đè<br/>
+                                            <select style="width: 150px" class="select3" name="denhan<%=i%>">
+                                                <option value="" img-data="">Tất cả</option>
+                                                <%
+                                                    for (BrandLabel one : allLabel) {
+                                                %>
+                                                <option value="<%=one.getId()%>"
+                                                        img-data="<%=(one.getStatus() == 1 ? "" : "/admin/resource/images/lock1.png")%>" >
+                                                    <%=one.getBrandLabel()%>
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                        <td align="center" colspan="2">
+                                            <input type="text" size="15" name="tmpid<%=i%>" placeholder="ID Temp" value=""/><br/>
+                                            <input type="text" size="15" name="lbid<%=i%>" placeholder="ID Label" value=""/><br/>
+                                            <input type="text" size="15" name="lbusername<%=i%>" placeholder="Username of Label" value=""/><br/> 
+                                            <!--<select style="width: 143px" class="select3" name="id_template<%=i%>">
+                                                <option value="">Chọn tin nhắn mẫu</option>
+                                                <%
+                                                    //ArrayList<Template_sms> allpro = Template_sms.getALL();
+                                                    //for (Template_sms one : allpro) {
+                                                %>
+                                                <option 
+                                                    value="<%//=one.getId()%>" 
+                                                    img-data="<%//=(one.getStatus() == 1 ? "" : "/admin/resource/images/lock1.png")%>" >[<%//=one.getDescription()%>] <%//= one.getStatus() == 1 ? "" : "[LOCK]"%></option>
+                                                <%
+                                                    //}
+                                                %>
+                                            </select>-->
+                                        </td>
+                                        <td align="center" colspan="2"></td>
+                                    </tr>
+                                    <%
+                                        }
+                                    %>
+                                    <tr>
+                                        <td colspan="12" align="center">
+                                            <% 
+                                                for (int i = 1; i < 8; i++) {
+                                            %>                                                
+                                            <div id="hide<%=i%>" style="float: right;display: none">
+                                                <img onclick="hide('<%=i%>')" src="<%=request.getContextPath()%>/admin/resource/images/delete.jpg" style="width: 16px;height: 16px;"/></a>
+                                            </div>
+                                            <%
+                                                }
+                                            %>
+                                            <div id="show1" style="float: right">
+                                                <img onclick="show('1')" src="<%= request.getContextPath()%>/admin/resource/images/Add.png"/>
+                                            </div>
+                                            <% 
+                                                for (int i = 2; i < 8; i++) {
+                                            %>
+                                            <div id="show<%=i%>" style="float: right;display: none"">
+                                                <img onclick="show('<%=i%>')" src="<%= request.getContextPath()%>/admin/resource/images/Add.png"/>
+                                            </div>                                             
+                                            <%
+                                                }
+                                            %>
+                                            <input onclick="return check()" class="button" type="submit" name="submit" value="Thêm mới"/>
+                                            <input class="button" onclick="window.location.href = '<%=request.getContextPath() + "/admin/brand-declare/index.jsp"%>'" type="reset" name="reset" value="Hủy"/>
+                                            <input type="text" value="0" name="numb" id="numb" style="display: none"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </form>
+
+                    </div><!-- end of right content-->
+                </div>   <!--end of center content -->
+                <div class="clear"></div>
+            </div> <!--end of main content-->
+            <%@include file="/admin/includes/footer.jsp" %>
+        </div>
+
+    </body>
+    <script>
+        function check() {
+            var brandname = document.getElementById('brandName').value;
+            if (brandname === '') {
+                alert('Không được để trống Brand Name');
+                return false;
+            }
+            if (brandname.length > 15) {
+                alert('Độ dài Brand Name không quá 15 ký tự');
+                return false;
+            }
+            var owner_id = document.getElementById('owner_id').value;
+            if (owner_id === '0') {
+                alert('Bạn phải chọn tài khoản sở hữu');
+                return false;
+            }
+            var i = document.getElementById('numb').value;
+            var n = parseInt(i);
+            if (n > 0) {
+                var c = document.getElementById('telco1').value;
+                if (c === '') {
+                    alert('Bạn phải nhập ít nhất một nhà mạng cho brandname');
+                    return false;
+                }
+                for (var e = 1; e <= n; e++) {
+                    var a = document.getElementById('telco'+e).value;
+                    if (a !== '') {
+                        var b = document.getElementById('cskh'+e).value;
+                        if (b === '0') {
+                            alert('Bạn phải nhập hướng đi cho mạng'+a+' đã chọn của brandname');
+                            return false;
+                        }
+                    }
+                }
+            } else { 
+                alert('Bạn phải nhập ít nhất một nhà mạng cho brandname');
+                return false;
+            }
+            return true;
+        }
+    </script>
+
+</html>

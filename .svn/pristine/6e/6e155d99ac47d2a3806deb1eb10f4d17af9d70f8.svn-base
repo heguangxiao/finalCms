@@ -1,0 +1,260 @@
+<%@page import="gk.myname.vn.admin.PriceTelco"%>
+<%@page import="gk.myname.vn.entity.PriceTelcoDb"%>
+<%@page import="gk.myname.vn.entity.Nations"%>
+<%@page import="gk.myname.vn.entity.Provider_Telco"%>
+<%@page import="gk.myname.vn.entity.Provider"%><%@page import="gk.myname.vn.utils.Tool"%><%@page import="gk.myname.vn.config.MyContext"%><%@page import="gk.myname.vn.utils.RequestTool"%><%@page import="java.util.Iterator"%><%@page import="java.util.ArrayList"%>
+<%@page contentType="text/html; charset=utf-8" %><!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html >
+    <head>
+        <%@include file="/admin/includes/header.jsp" %>
+        <script type="text/javascript">
+            $(document).ready(function () {
+                $("#providerCode").select2({
+                    formatResult: function (item) {
+                        var valOpt = $(item.element).attr('img-data');
+                        if (!valOpt) {
+                            return ('<div><b>' + item.text + '</b></div>');
+                        } else {
+                            return ('<div><span><b style="color: red">' + item.text + '<b> <img src="' + valOpt + '" class="img-flag" /></span></div>');
+                        }
+                    },
+                    formatSelection: function (item) {
+                        //  load page or selected
+                        var opt = $("#providerCode option:selected");
+                        var valOpt = opt.attr("img-data");
+                        if (!valOpt) {
+                            return ('<b>' + item.text + '</b>');
+                        } else {
+                            return ('<div><span><b style="color: red">' + item.text + '</b> <img src="' + valOpt + '" class="img-flag" /></span></div>');
+                        }
+                    },
+                    dropdownCssClass: "bigdrop", // apply css that makes the dropdown taller
+                    escapeMarkup: function (m) {
+                        return m;
+                    }
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <%  //-          
+            if (!userlogin.checkView(request)) {
+                session.setAttribute("mess", "Bạn không có quyền thêm module này!");
+                response.sendRedirect(request.getContextPath() + "/admin");
+                return;
+            }
+            int max = 50;
+            ArrayList<Provider> all = null;
+            Provider pDao = new Provider();
+            ArrayList<Nations> allna = null;
+            Nations pDaona = new Nations();
+            allna = pDaona.getAll();
+            int currentPage = RequestTool.getInt(request, "page", 1);
+            String code = RequestTool.getString(request, "code");
+            String name = RequestTool.getString(request, "name");
+            all = pDao.getProvider(currentPage, max, code, name);
+            int totalPage = 0;
+            int totalRow = pDao.countProvider(code, name);
+            totalPage = (int) totalRow / max;
+            if (totalRow % max != 0) {
+                totalPage++;
+            }
+            String urlExport = request.getContextPath() + "/admin/provider/exp/export_provider.jsp?";
+            urlExport += "&currentPage=" + currentPage;
+            urlExport += "&max=" + max;
+            urlExport += "&code=" + code;
+            urlExport += "&name=" + name;
+        %>
+        <div id="main_container">
+            <%@include file="/admin/includes/checkLogin.jsp" %>
+            <div class="main_content">
+                <%@include file="/admin/includes/menu.jsp" %>
+                <div class="center_content">
+                    <div class="right_content">
+                        <!-- Tìm kiếm-->
+                        <form action="<%=request.getContextPath() + "/admin/provider/index.jsp"%>" method="post">
+                            <table id="rounded-corner" align="center">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="rounded-company"></th>
+                                        <th scope="col" class="rounded"></th>
+                                        <th scope="col" class="rounded-q4 redBoldUp">Tìm kiếm Nhà Cung Cấp</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td></td>
+                                        <td>Provider </td>
+                                        <td>
+                                            <select style="width: 300px" name="code" id="providerCode">
+                                                <option value="">***** Chọn nhà cung cấp*****</option>
+                                                <%
+                                                    ArrayList<Provider> allpro = Provider.getCACHE();
+                                                    for (Provider one : allpro) {
+                                                %>
+                                                <option value="<%=one.getCode()%>" 
+                                                        img-data="<%=(one.getStatus() == 1 ? "" : request.getContextPath() +"/admin/resource/images/lock1.png")%>" >[<%=one.getCode()%>] <%=one.getName()%> <%= one.getStatus() == 1 ? "" : "[LOCK]"%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr align="center">
+                                        <td colspan="3">
+                                            <input class="button" type="submit" name="submit" value="Tìm kiếm"/>
+                                            &nbsp;&nbsp;
+                                            <input class="button" onclick="location.href = '<%=request.getContextPath() + "/admin/provider/add.jsp"%>'" type="button" name="Thêm mới" value="Thêm mới"/>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;
+                                            <input onclick="window.open('<%=urlExport%>')" class="button" type="button" name="button" value="Xuất Excel"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </form>      
+                        <!--End tim kiếm-->
+                        <%@include file="/admin/includes/page.jsp" %>
+                        <div align="center" style="height: auto;margin-bottom: 2px; color: red;font-weight: bold">
+                            <%                                
+                                if (session.getAttribute("mess") != null) {
+                                    out.print(session.getAttribute("mess"));
+                                    session.removeAttribute("mess");
+                                }
+                            %>
+                        </div>
+                        <!--Content-->
+                        <table align="center" id="rounded-corner" summary="Msc Joint Stock Company" >
+                            <thead>
+                                <tr>
+                                    <th>Tên nhà cung cấp</th>
+                                    <th>Hướng Mua</th>
+                                    <th>Trạng thái</th>
+                                    <th>Nhập giá</th>
+                                    <th>Edit</th>
+                                    <th>Delete</th>
+                                    <th>Giá</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <%
+                                    int count = 1; //Bien dung de dem so dong
+                                    for (Iterator<Provider> iter = all.iterator(); iter.hasNext();) {
+                                        Provider oneProvi = iter.next();
+                                        int tmp = (currentPage - 1) * 25 + count++;
+                                %>
+                                <tr>
+                                    <td class="boder_right" align="left">
+                                        <%=oneProvi.getName()%>
+                                    </td>                                
+                                    <td class="boder_right" align="left">
+                                        <%=oneProvi.getAllow_telco()%>
+                                    </td>                                
+
+                                    <td class="boder_right" align="center">
+                                        <%
+                                            if (oneProvi.getStatus() == 1) {
+                                        %>
+                                        <img src="<%= request.getContextPath()%>/admin/resource/images/active.png"/>
+                                        <%
+                                        } else if (oneProvi.getStatus() == Tool.STATUS.DEL.val) {
+                                        %>
+                                        <img src="<%= request.getContextPath()%>/admin/resource/images/Full_Recycle_Bin.png"/>
+                                        <%
+                                        } else {
+                                        %>
+                                        <img src="<%= request.getContextPath()%>/admin/resource/images/key_lock.png"/>
+                                        <%
+                                            }
+                                        %>
+                                    </td>
+                                    <td class="boder_right" align="center">
+                                        <a href="<%=request.getContextPath() + "/admin/provider/add_price.jsp?code=" + oneProvi.getCode()%>"><img src="<%= request.getContextPath()%>/admin/resource/images/Add.png"/></a>
+                                    </td>
+                                    <%=buildControl(request, userlogin, 
+                                            "/admin/provider/edit.jsp?id=" + oneProvi.getId(), 
+                                            "/admin/provider/del.jsp?id=" + oneProvi.getId())%>
+                                    <%                                        
+                                        ArrayList<PriceTelcoDb> ptds = PriceTelcoDb.getAllWithProIdAndCode(oneProvi.getCode(), oneProvi.getId());
+                                    %>    
+                                    <td width="400">
+                                        <b style="color: black">Giá mua tin Cskh </b><br/>
+                                        <%
+                                            for (PriceTelcoDb elem : ptds) {
+                                                PriceTelco pt = PriceTelco.json2Objec(elem.getPriceCskh());
+                                        %>
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            <b><%=elem.getTelcoCode()%> : </b><br/>
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            <%=pt.getGroup0Price() > 0 ? "N0 : "+Tool.dinhDangTienTe(pt.getGroup0Price()+"")+" , "  : ""%> 
+                                            <%=pt.getGroup1Price() > 0 ? "N1 : "+Tool.dinhDangTienTe(pt.getGroup1Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup2Price() > 0 ? "N2 : "+Tool.dinhDangTienTe(pt.getGroup2Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup3Price() > 0 ? "N3 : "+Tool.dinhDangTienTe(pt.getGroup3Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup4Price() > 0 ? "N4 : "+Tool.dinhDangTienTe(pt.getGroup4Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup5Price() > 0 ? "N5 : "+Tool.dinhDangTienTe(pt.getGroup5Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup6Price() > 0 ? "N6 : "+Tool.dinhDangTienTe(pt.getGroup6Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup7Price() > 0 ? "N7 : "+Tool.dinhDangTienTe(pt.getGroup7Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup8Price() > 0 ? "N8 : "+Tool.dinhDangTienTe(pt.getGroup8Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup9Price() > 0 ? "N9 : "+Tool.dinhDangTienTe(pt.getGroup9Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup10Price() > 0 ? "N10 : "+Tool.dinhDangTienTe(pt.getGroup10Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup11Price() > 0 ? "N11 : "+Tool.dinhDangTienTe(pt.getGroup11Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup12Price() > 0 ? "N12 : "+Tool.dinhDangTienTe(pt.getGroup12Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup13Price() > 0 ? "N13 : "+Tool.dinhDangTienTe(pt.getGroup13Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup14Price() > 0 ? "N14 : "+Tool.dinhDangTienTe(pt.getGroup14Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup15Price() > 0 ? "N15 : "+Tool.dinhDangTienTe(pt.getGroup15Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroupLCPrice() > 0 ? "NLC : "+Tool.dinhDangTienTe(pt.getGroupLCPrice()+"")+" , "  : ""%>
+                                            <br/>
+                                        <%
+                                            }
+                                        %>
+                                        <b style="color: black">Giá mua tin Qc </b><br/>
+                                        <%
+                                            for (PriceTelcoDb elem : ptds) {
+                                                PriceTelco pt = PriceTelco.json2Objec(elem.getPriceQc());
+                                        %>
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            <b><%=elem.getTelcoCode()%> : </b><br/> 
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;
+                                            &nbsp;&nbsp;                                           
+                                            &nbsp;&nbsp;
+                                            <%=pt.getGroup0Price() > 0 ? "N0 : "+Tool.dinhDangTienTe(pt.getGroup0Price()+"")+" , "  : ""%> 
+                                            <%=pt.getGroup1Price() > 0 ? "N1 : "+Tool.dinhDangTienTe(pt.getGroup1Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup2Price() > 0 ? "N2 : "+Tool.dinhDangTienTe(pt.getGroup2Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup3Price() > 0 ? "N3 : "+Tool.dinhDangTienTe(pt.getGroup3Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup4Price() > 0 ? "N4 : "+Tool.dinhDangTienTe(pt.getGroup4Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup5Price() > 0 ? "N5 : "+Tool.dinhDangTienTe(pt.getGroup5Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup6Price() > 0 ? "N6 : "+Tool.dinhDangTienTe(pt.getGroup6Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup7Price() > 0 ? "N7 : "+Tool.dinhDangTienTe(pt.getGroup7Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup8Price() > 0 ? "N8 : "+Tool.dinhDangTienTe(pt.getGroup8Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup9Price() > 0 ? "N9 : "+Tool.dinhDangTienTe(pt.getGroup9Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup10Price() > 0 ? "N10 : "+Tool.dinhDangTienTe(pt.getGroup10Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup11Price() > 0 ? "N11 : "+Tool.dinhDangTienTe(pt.getGroup11Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup12Price() > 0 ? "N12 : "+Tool.dinhDangTienTe(pt.getGroup12Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup13Price() > 0 ? "N13 : "+Tool.dinhDangTienTe(pt.getGroup13Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup14Price() > 0 ? "N14 : "+Tool.dinhDangTienTe(pt.getGroup14Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroup15Price() > 0 ? "N15 : "+Tool.dinhDangTienTe(pt.getGroup15Price()+"")+" , "  : ""%>
+                                            <%=pt.getGroupLCPrice() > 0 ? "NLC : "+Tool.dinhDangTienTe(pt.getGroupLCPrice()+"")+" , "  : ""%>
+                                            <br/>
+                                        <%
+                                            }
+                                        %>
+                                    </td>   
+                                </tr>
+                                <%
+                                    }
+                                %>
+                            </tbody>
+                        </table>
+                    </div><!-- end of right content-->
+                </div>   <!--end of center content -->
+                <div class="clear"></div>
+            </div> <!--end of main content-->
+            <%@include file="/admin/includes/footer.jsp" %>
+        </div>
+    </body>
+</html>

@@ -1,0 +1,353 @@
+package gk.myname.vn.entity;
+
+import gk.myname.vn.db.DBPool;
+import static gk.myname.vn.entity.BrandLabel.reload;
+import gk.myname.vn.utils.Tool;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import org.apache.log4j.Logger;
+
+/**
+ *
+ * @author Phan Thanh Tùng
+ */
+public class Nations {
+
+    static final Logger logger = Logger.getLogger(Nations.class);
+    public static final HashMap<Integer, Nations> CACHE = new HashMap<>();
+
+    static {
+        try {
+            Nations dao = new Nations();
+            ArrayList<Nations> cache = dao.getAll();
+            for (Nations one : cache) {
+                CACHE.put(one.getId(), one);
+            }
+        } catch (Exception e) {
+            System.out.println("Error when initialize : " + e);
+        }
+    }
+    
+
+    public static Nations getNation(String country_code) {
+        synchronized (CACHE) {
+            Nations result = null;
+            Collection<Nations> coll = CACHE.values();
+            for (Nations one : coll) {
+                if (one.getCountry_code().equals(country_code)) {
+                    result = one;
+                    break;
+                }
+            }
+            CACHE.notifyAll();
+            return result;
+        }
+    }
+
+    public static Nations getPrefix(String country_prefix) {
+        synchronized (CACHE) {
+            Nations result = null;
+            Collection<Nations> coll = CACHE.values();
+            for (Nations one : coll) {
+                if (one.getCountry_prefix().equals(country_prefix)) {
+                    result = one;
+                    break;
+                }
+            }
+            CACHE.notifyAll();
+            return result;
+        }
+    }
+    
+    int id;
+    String country_code;
+    String country_prefix;
+    String country_name;
+
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    public String getCountry_code() {
+        return country_code;
+    }
+
+    public void setCountry_code(String country_code) {
+        this.country_code = country_code;
+    }
+
+    public String getCountry_prefix() {
+        return country_prefix;
+    }
+
+    public void setCountry_prefix(String country_prefix) {
+        this.country_prefix = country_prefix;
+    }
+
+    public String getCountry_name() {
+        return country_name;
+    }
+
+    public void setCountry_name(String country_name) {
+        this.country_name = country_name;
+    }
+
+    public Nations(int id, String country_code, String country_prefix, String country_name) {
+        this.id = id;
+        this.country_code = country_code;
+        this.country_prefix = country_prefix;
+        this.country_name = country_name;
+    }
+
+    public Nations() {
+    }
+
+    public static ArrayList<Nations> getAll() {
+        ArrayList<Nations> result = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT N.* FROM NATIONS N WHERE 1=1 ";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            rs = pstm.executeQuery();
+            while (rs.next()) {
+                Nations one = new Nations();
+                one.setId(rs.getInt("ID"));
+                one.setCountry_code(rs.getString("COUNTRY_CODE"));
+                one.setCountry_name(rs.getString("COUNTRY_NAME"));
+                one.setCountry_prefix(rs.getString("COUNTRY_PREFIX"));
+                result.add(one);
+            }
+        } catch (SQLException e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public ArrayList<Nations> getNa(int page, int limit, String country_name) {
+        ArrayList<Nations> result = new ArrayList<>();
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT N.* FROM NATIONS N WHERE 1=1 ";
+        try {
+            if (!Tool.checkNull(country_name)) {
+                sql += " AND (COUNTRY_NAME LIKE ? OR COUNTRY_CODE LIKE ?)";
+            }
+            sql += " ORDER BY N.ID ASC LIMIT ?,?";
+            int start = (page - 1) * limit;
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            int i = 1;
+            if (!Tool.checkNull(country_name)) {
+                pstm.setString(i++, "%" + country_name + "%");
+                pstm.setString(i++, "%" + country_name + "%");
+            }
+            pstm.setInt(i++, start);
+            pstm.setInt(i++, limit);
+            rs = pstm.executeQuery();
+            while (rs.next()) {
+                Nations one = new Nations();
+                one.setId(rs.getInt("ID"));
+                one.setCountry_code(rs.getString("COUNTRY_CODE"));
+                one.setCountry_name(rs.getString("COUNTRY_NAME"));
+                one.setCountry_prefix(rs.getString("COUNTRY_PREFIX"));
+                result.add(one);
+            }
+        } catch (Exception e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public int countNa(String country_name) {
+        int result = 0;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT count(*) FROM NATIONS N WHERE 1=1 ";
+        try {
+            if (!Tool.checkNull(country_name)) {
+                sql += " AND COUNTRY_NAME like ?";
+            }
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            int i = 1;
+            if (!Tool.checkNull(country_name)) {
+                pstm.setString(i++, "%" + country_name + "%");
+            }
+            rs = pstm.executeQuery();
+            if (rs.next()) {
+                result = rs.getInt(1);
+            }
+        } catch (Exception e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public boolean del_ever(int id) {
+        boolean result = false;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "DELETE FROM NATIONS WHERE ID = ?";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            pstm.setInt(1, id);
+            if (pstm.executeUpdate() > 0) {
+                reload();
+            }
+            result = true;
+        } catch (Exception e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public boolean addNa(Nations one) {
+        boolean result = false;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "INSERT INTO NATIONS(COUNTRY_CODE,COUNTRY_NAME,COUNTRY_PREFIX) "
+                + "               VALUES  (          ?,         ?  ,          ?   ) ";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            int i = 1;
+            pstm.setString(i++, one.getCountry_code());
+            pstm.setString(i++, one.getCountry_name());
+            pstm.setString(i++, one.getCountry_prefix());
+            if (pstm.executeUpdate() == 1) {
+                result = true;
+                reload();
+            }
+        } catch (Exception e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public boolean updateNa(Nations one) {
+        boolean result = false;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "UPDATE NATIONS SET COUNTRY_CODE = ?,COUNTRY_NAME = ?,COUNTRY_PREFIX = ?"
+                + " WHERE ID = ? ";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            int i = 1;
+            pstm.setString(i++, one.getCountry_code());
+            pstm.setString(i++, one.getCountry_name());
+            pstm.setString(i++, one.getCountry_prefix());
+            pstm.setInt(i++, one.getId());
+            result = pstm.executeUpdate() == 1;
+            if (result) {
+                reload();
+            }
+        } catch (Exception e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public static Nations getbyId(int id) {
+        Nations result = null;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT N.* FROM NATIONS N WHERE ID = ?";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            pstm.setInt(1, id);
+            rs = pstm.executeQuery();
+            if (rs.next()) {
+                result = new Nations();
+                result.setId(rs.getInt("ID"));
+                result.setCountry_code(rs.getString("COUNTRY_CODE"));
+                result.setCountry_name(rs.getString("COUNTRY_NAME"));
+                result.setCountry_prefix(rs.getString("COUNTRY_PREFIX"));
+            }
+        } catch (SQLException e) {
+            logger.error(Tool.getLogMessage(e));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return result;
+    }
+
+    public Nations getByCountry_code(String country_code) {
+        Nations acc = null;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNTRY_CODE FROM NATIONS WHERE COUNTRY_CODE = ?";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            pstm.setString(1, country_code);
+            rs = pstm.executeQuery();
+            if (rs.next()) {
+                acc = new Nations();
+                acc.setCountry_code(rs.getString("COUNTRY_CODE"));
+            }
+        } catch (SQLException ex) {
+            logger.error(Tool.getLogMessage(ex));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return acc;
+    }
+    
+    public Nations getByCountry_prefix(String country_prefix) {
+        Nations acc = null;
+        Connection conn = null;
+        PreparedStatement pstm = null;
+        ResultSet rs = null;
+        String sql = "SELECT COUNTRY_PREFIX FROM NATIONS WHERE COUNTRY_PREFIX = ?";
+        try {
+            conn = DBPool.getConnection();
+            pstm = conn.prepareStatement(sql);
+            pstm.setString(1, country_prefix);
+            rs = pstm.executeQuery();
+            if (rs.next()) {
+                acc = new Nations();
+                acc.setCountry_prefix(rs.getString("COUNTRY_PREFIX"));
+            }
+        } catch (SQLException ex) {
+            logger.error(Tool.getLogMessage(ex));
+        } finally {
+            DBPool.freeConn(rs, pstm, conn);
+        }
+        return acc;
+    }
+
+}

@@ -1,0 +1,445 @@
+<%@page import="gk.myname.vn.entity.Nations"%>
+<%@page import="gk.myname.vn.entity.GroupProvider"%>
+<%@page import="gk.myname.vn.entity.RouteNationTelco"%>
+<%@page import="gk.myname.vn.entity.Telco_Nations"%>
+<%@page import="gk.myname.vn.utils.DateProc"%>
+<%@page import="gk.myname.vn.entity.OptionCheckDuplicate"%>
+<%@page import="gk.myname.vn.entity.OptionVina"%>
+<%@page import="gk.myname.vn.entity.OptionTelco"%>
+<%@page import="gk.myname.vn.utils.SMSUtils"%>
+<%@page import="gk.myname.vn.entity.RouteTable"%>
+<%@page import="gk.myname.vn.entity.Provider"%>
+<%@page import="gk.myname.vn.utils.Tool"%>
+<%@page import="gk.myname.vn.config.MyContext"%>
+<%@page import="gk.myname.vn.utils.RequestTool"%>
+<%@page import="gk.myname.vn.entity.BrandLabel"%>
+<%@page import="java.util.Iterator"%>
+<%@page import="java.util.ArrayList"%>
+<%@page contentType="text/html; charset=utf-8" %>
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html >
+    <head>
+        <%@include file="/admin/includes/header.jsp" %>
+        <script type="text/javascript" language="javascript">
+            var now = new Date();
+            var month = now.getUTCMonth()-2;
+            var year = now.getUTCFullYear();
+            var str = year + '/' + month + '/' + 1;
+            $(document).ready(function () {
+                $('.dateproc').datetimepicker({
+                    lang: 'vi',
+                    timepicker: false,
+                    format: 'd/m/Y',
+                    formatDate: 'Y/m/d',
+                    minDate: '2016/12/01', // yesterday is minimum date
+                    maxDate: '+1970/01/02' // and tommorow is maximum date calendar
+                });
+                 $('.ItemPopup').showPopup({
+                    top: 100,
+                    closeButton: ".close_popup", //khai báo nút close cho popup
+                    scroll: 0, //cho phép scroll khi mở popup, mặc định là không cho phép
+                    width: 500,
+                    height: 'auto',
+                    closeOnEscape: true
+                });                
+            });
+            function validMonth() {
+                var stRequest = $("#stRequest").val();
+                var endRequest = $("#endRequest").val();
+                var arrstRequest = stRequest.split("/");
+                var arrendRequest = endRequest.split("/");
+                if (stRequest !== "" && stRequest !== null) {
+                    if (endRequest === "" || endRequest === null) {
+                        jAlert("Bạn cần chọn ngày kết thúc...");
+                        return false;
+                    }
+                    if (arrstRequest[2] !== arrendRequest[2]) {
+                        jAlert("Năm bạn chọn không hợp lệ...");
+                        return false;
+                    }
+                }
+            }
+            $(document).ready(function () {
+                $('#_dataTable').DataTable({
+                    "order": [[0, "asc"]],
+                    "bPaginate": false,
+                    "bLengthChange": false,
+                    "bFilter": true,
+                    "bInfo": false,
+                    "bAutoWidth": false
+                });
+            });
+            $(document).ready(function () {
+                $('.ask').jConfirmAction();
+            });
+            function  delChoice() {
+                var supertarget = '<%=request.getContextPath() + "/admin/brand/delallBrand.jsp"%>';
+                var theForm = document.getElementById("mainForm");
+                theForm.action = supertarget;
+                theForm.submit();
+            }
+            
+            function changeTelco(i) {
+                var url = "<%=request.getContextPath()%>/admin/statistic/ajax/listTelco.jsp?code=" + i;
+                AjaxAction(url, "telco");
+            }
+        </script>
+    </head>
+    <body>
+        <%
+            ArrayList<BrandLabel> allBrand = null;
+            BrandLabel dao = new BrandLabel();
+            int currentPage = RequestTool.getInt(request, "page", 1);
+            int status = RequestTool.getInt(request, "status", -2);
+            String _label = RequestTool.getString(request, "_label");
+            String stRequest = RequestTool.getString(request, "stRequest");
+            if (Tool.checkNull(stRequest)) {
+                stRequest = "01/12/2016";
+            }
+            String endRequest = RequestTool.getString(request, "endRequest");
+            if (Tool.checkNull(endRequest)) {
+                endRequest = DateProc.createDDMMYYYY();
+            }
+            String telco = RequestTool.getString(request, "telco");
+            String nation = RequestTool.getString(request, "nation");
+            String groupBr = RequestTool.getString(request, "groupBr");
+            String providerCode = RequestTool.getString(request, "providerCode");
+            String cpuser = RequestTool.getString(request, "cpuser", "0");
+            int type = RequestTool.getInt(request, "type", -2);
+            
+            allBrand = dao.getAll2(currentPage, maxRow, _label, cpuser, status, providerCode, telco, groupBr, stRequest, endRequest, nation, type);
+            int totalPage = 0;
+            int totalRow = dao.countAll2(_label, cpuser, status, providerCode, telco, groupBr, stRequest, endRequest, nation, type);
+            totalPage = (int) totalRow / maxRow;
+            if (totalRow % maxRow != 0) {
+                totalPage++;
+            }
+            RequestTool.debugParam(request);
+            String urlExport = request.getContextPath() + "/admin/brand/exportBrand.jsp?";
+            String dataGet = "";
+            dataGet += "page=" + currentPage;
+            dataGet += "&status=" + status;
+            dataGet += "&_label=" + _label;
+            dataGet += "&telco=" + telco;
+            dataGet += "&groupBr=" + groupBr;
+            dataGet += "&providerCode=" + providerCode;
+            dataGet += "&cpuser=" + cpuser;
+            dataGet += "&stRequest=" + stRequest;
+            dataGet += "&endRequest=" + endRequest;
+            dataGet += "&nation=" + nation;
+            dataGet += "&type=" + type;
+            urlExport += dataGet;
+        %>
+        <div id="main_container">
+            <%@include file="/admin/includes/checkLogin.jsp" %>
+            <div class="main_content">
+                <%@include file="/admin/includes/menu.jsp" %>
+                <div class="center_content">
+                    <div class="right_content">
+                        <!-- Tìm kiếm-->
+                        <form action="<%=request.getContextPath() + "/admin/brand/index.jsp"%>" method="post">
+                            <table id="rounded-corner" align="center">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="rounded-company"></th>
+                                        <th scope="col" class="rounded"></th>
+                                        <th scope="col" class="rounded-q4">HỆ THỐNG QUẢN LÝ BRAND NAME</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Từ</span></td>
+                                        <td>
+                                            <input readonly value="<%=stRequest%>" class="dateproc" size="6" id="stRequest" type="text" name="stRequest"/>
+                                            &nbsp;&nbsp;&nbsp;
+                                            <span class="redBold">Đến </span>
+                                            <input readonly value="<%=endRequest%>" class="dateproc" size="6" id="endRequest" type="text" name="endRequest"/>
+                                            &nbsp;&nbsp;&nbsp;
+                                            <span class="redBold">Trạng thái</span>
+                                            <select class="select3" style="width: 80px" name="status">
+                                                <option value="-2">Tất cả</option>
+                                                <option <%=(status == 1 ? "selected='selected'" : "")%> value="1">Đã duyệt</option>
+                                                <option <%=(status == 0 ? "selected='selected'" : "")%> value="0">Khóa</option>
+                                                <!--<option <%=(status == 404 ? "selected='selected'" : "")%> value="404">Xóa</option>-->
+                                            </select>
+                                            &nbsp;&nbsp;&nbsp;
+                                            <span class="redBold">Nhóm</span>
+                                            <select class="select3" style="width: 110px" name="groupBr">
+                                                <option value="">Chọn nhóm</option>
+                                                <option <%= groupBr.equals("N0") ? "selected='selected'" : ""%> value="N0">Nhóm N0</option>
+                                                <option <%= groupBr.equals("N1") ? "selected='selected'" : ""%> value="N1">Nhóm N1</option>
+                                                <option <%= groupBr.equals("N2") ? "selected='selected'" : ""%> value="N2">Nhóm N2</option>
+                                                <option <%= groupBr.equals("N3") ? "selected='selected'" : ""%> value="N3">Nhóm N3</option>
+                                                <option <%= groupBr.equals("N4") ? "selected='selected'" : ""%> value="N4">Nhóm N4</option>
+                                                <option <%= groupBr.equals("N5") ? "selected='selected'" : ""%> value="N5">Nhóm N5</option>
+                                                <option <%= groupBr.equals("N6") ? "selected='selected'" : ""%> value="N6">Nhóm N6</option>
+                                                <option <%= groupBr.equals("N7") ? "selected='selected'" : ""%> value="N7">Nhóm N7</option>
+                                                <option <%= groupBr.equals("N8") ? "selected='selected'" : ""%> value="N8">Nhóm N8</option>
+                                                <option <%= groupBr.equals("N9") ? "selected='selected'" : ""%> value="N9">Nhóm N9</option>
+                                                <option <%= groupBr.equals("N10") ? "selected='selected'" : ""%> value="N10">Nhóm N10</option>
+                                                <option <%= groupBr.equals("N11") ? "selected='selected'" : ""%> value="N11">Nhóm N11</option>
+                                                <option <%= groupBr.equals("N12") ? "selected='selected'" : ""%> value="N12">Nhóm N12</option>
+                                                <option <%= groupBr.equals("N13") ? "selected='selected'" : ""%> value="N13">Nhóm N13</option>
+                                                <option <%= groupBr.equals("N14") ? "selected='selected'" : ""%> value="N14">Nhóm N14</option>
+                                                <option <%= groupBr.equals("N15") ? "selected='selected'" : ""%> value="N15">Nhóm N15</option>
+                                                <option <%= groupBr.equals("NLC") ? "selected='selected'" : ""%> value="NLC">Nhóm NLC</option>
+                                            </select>
+                                            &nbsp;&nbsp;&nbsp;
+                                            <span class="redBold">Type </span>
+                                            <select class="select3" style="width: 100px" name="type">
+                                                <option value="-2">Tất cả</option>
+                                                <option <%=(type == 0 ? "selected='selected'" : "")%> value="0">BRANDNAME</option>
+                                                <option <%=(type == 1 ? "selected='selected'" : "")%> value="1">LONGCODE</option>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Brand Label</span></td>
+                                        <td>
+                                            <select style="width: 180px" id="_label" name="_label">
+                                                <option value="">Tất cả</option>
+                                                <%ArrayList<BrandLabel> allLabel = BrandLabel.getAll();
+                                                    for (BrandLabel one : allLabel) {
+                                                %>
+                                                <option id="_<%=one.getId()%>" status="_<%=one.getStatus()%>" <%=_label.equals(one.getBrandLabel()) ? "selected='selected'" : ""%> value="<%=one.getBrandLabel()%>"><%=one.getBrandLabel()%> - [<%=one.getUserOwner()%>] <%=one.getStatus() == 1 ? "" : "[Lock]"%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Nation</span></td>
+                                        <td>                                        
+                                            <select onchange="changeTelco(this.value)" class="select3" style="width: 400px" id="nation" name="nation">
+                                                <option value="">Tất cả</option>
+                                                <% 
+                                                    ArrayList<Nations> nations = Nations.getAll();
+                                                    for (Nations elem : nations) {
+                                                %>
+                                                <option <%=nation.equalsIgnoreCase(elem.getCountry_code()) ? "selected='selected'" : ""%> value="<%=elem.getCountry_code()%>">[<%=elem.getCountry_code()%>] <%=elem.getCountry_name()%></option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                            <span class="redBold">Telco</span>
+                                            <select class="select3" style="width: 350px;float: right" name="telco" id="telco">
+                                                <option value="">Tất cả</option>
+                                                <%
+                                                    ArrayList<Telco_Nations> arrayList = Telco_Nations.getTelco_na();
+                                                    for (Telco_Nations elem : arrayList) {
+                                                %>
+                                                <option <%=telco.equals(elem.getTelco_code()) ? "selected='selected'" : ""%> value="<%=elem.getTelco_code()%>"><%=elem.getTelco_name()%></option>
+                                                <%
+                                                        }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td><span class="redBold">Nhà Cung Cấp</span></td>
+                                        <td>
+                                            <select style="width: 400px" name="providerCode" id="_agentcy_id">
+                                                <option value="">Tất cả</option>
+                                                <%
+                                                    ArrayList<Provider> allpro = Provider.getCACHE();
+                                                    for (Provider one : allpro) {
+                                                        if(one.getStatus() != 1) continue;
+                                                %>
+                                                <option <%= providerCode.equals(one.getCode()) ? "selected='selected'" : ""%>
+                                                    value="<%=one.getCode()%>"
+                                                    img-data="<%=(one.getStatus() == 1 ? "" : request.getContextPath() +"/admin/resource/images/lock1.png")%>" >
+                                                    <%=one.getName()%> <%= one.getStatus() == 1 ? "" : "[LOCK]"%>
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                            <span class="redBold">Khách hàng</span>
+                                            <select style="width: 350px;float: right" name="cpuser" id="_userSender">
+                                                <option <%= cpuser.equals("0") ? "selected='selected'" : ""%> value="0">Tất cả</option>
+                                                <%
+                                                    ArrayList<Account> allCp = Account.getAllCP();
+                                                    for (Account one : allCp) {
+                                                %>
+                                                <option <%= cpuser.equals(one.getUserName()) ? "selected='selected'" : ""%>
+                                                    value="<%=one.getUserName()%>" img-data="<%=(one.getStatus() == 1 ? "" : request.getContextPath() +"/admin/resource/images/lock1.png")%>" >
+                                                    [<%=one.getUserName()%>] <%=one.getFullName()%> 
+                                                </option>
+                                                <%
+                                                    }
+                                                %>
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr align="center">
+                                        <td colspan="3">
+                                            <input class="button" type="submit" name="btnsearch" value="Tìm kiếm"/>
+                                            &nbsp;&nbsp;
+                                            <%--<%= //buildAddControl(request, userlogin, "/admin/brand/add.jsp")%>--%>
+                                            &nbsp;&nbsp;&nbsp;&nbsp;
+                                            <input onclick="window.open('<%=urlExport%>')" class="button" type="button" name="btnExport" value="Xuất Excel"/>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </form>      
+                        <!--End tim kiếm-->
+                        <div align="center" style="height: auto;margin-bottom: 2px; color: red;font-weight: bold">
+                            <%
+                                if (session.getAttribute("mess") != null) {
+                                    out.print(session.getAttribute("mess"));
+                                    session.removeAttribute("mess");
+                                }
+                            %>
+                        </div>
+                        <%@include file="/admin/includes/page.jsp" %>
+                        <!--Content-->
+                        <form action="" name="mainForm" id="mainForm">
+                            <table style="font-size: 11px" id="_dataTable" class="display" cellspacing="0" width="100%">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="rounded">STT</th>
+                                        <th scope="col" class="rounded">Brand Name</th>
+                                        <th scope="col" class="rounded">Type</th>
+                                        <th scope="col" class="rounded">Hết hạn</th>
+                                        <th scope="col" class="rounded">Tài khoản</th>
+                                        <th scope="col" class="rounded">Định Tuyến</th>
+                                        <th scope="col" class="rounded">Create Date</th>
+                                        <th scope="col" class="rounded">Create By</th>
+                                        <th scope="col" class="rounded">Hồ sơ</th>
+                                        <th scope="col" class="rounded">Trạng thái</th>
+                                            <%=buildHeader(request, userlogin, true, true)%>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <%
+                                        int count = 1;
+                                        for (Iterator<BrandLabel> iter = allBrand.iterator(); iter.hasNext();) {
+                                            BrandLabel oneBrand = iter.next();
+                                            int tmp = (currentPage - 1) * maxRow + count++;
+                                            ArrayList<RouteNationTelco> routeNationTelcos = RouteNationTelco.getAllByBrandnameAndUserowner(oneBrand.getBrandLabel(), oneBrand.getUserOwner());
+                                    %>
+                                    <tr>
+                                        <td class="boder_right"><%=tmp%></td>
+                                        <td class="boder_right" align="left">
+                                            <b><%=oneBrand.getBrandLabel()%></b>
+                                        </td>
+                                        <td class="boder_right" align="left">
+                                            <b><%=oneBrand.getType() == 1 ? "LONGCODE" : "BRANDNAME"%></b>
+                                        </td>
+                                        <td class="boder_right" align="left">
+                                            <b><%=oneBrand.getExp() == null ? "" : oneBrand.getExp()%></b>
+                                        </td>
+                                        <td class="boder_right" align="left">
+                                            <%
+                                                String checkTempString = "";
+                                                if(oneBrand.getCheckTemp()==1){
+                                                    checkTempString = "(<b style='color:blue;'>Check Temp</b>)";
+                                                }
+                                            %>
+                                            <%=oneBrand.getUserOwner()+checkTempString%>
+                                            
+                                        </td>
+                                        <td class="boder_right" style="width: 180px" align="left">
+                                            <SCRIPT language="javascript">
+                                                function addDTGT(name) {
+//                                                    for (let el of document.querySelectorAll('.dt'+name)) el.style.display = '';
+                                                    document.getElementById('dt'+name).style.display = '';
+                                                    document.getElementById('add'+name).style.display = 'none';
+                                                    document.getElementById('del'+name).style.display = '';
+                                                }
+
+                                                function deleteDTGT(name) {
+//                                                    for (let el of document.querySelectorAll('.dt'+name)) el.style.display = 'none';
+                                                    document.getElementById('dt'+name).style.display = 'none';
+                                                    document.getElementById('add'+name).style.display = '';
+                                                    document.getElementById('del'+name).style.display = 'none';
+                                                }                                                
+                                            </SCRIPT>
+                                                <div colspan="1" id="<%="add" + oneBrand.getBrandLabel() + oneBrand.getUserOwner()%>" align="center">
+                                                    <img onclick="addDTGT('<%=oneBrand.getBrandLabel() + oneBrand.getUserOwner()%>')" src="<%= request.getContextPath()%>/admin/resource/images/Add.png"/></a>
+                                                </div>
+                                                <div colspan="1" id="<%="del" + oneBrand.getBrandLabel() + oneBrand.getUserOwner()%>" style="display: none" align="center">
+                                                    <img style="width: 16px;height: 16px;" onclick="deleteDTGT('<%=oneBrand.getBrandLabel() + oneBrand.getUserOwner()%>')" src="<%= request.getContextPath()%>/admin/resource/images/delete.jpg"/></a>
+                                                </div>
+                                            <div id="<%="dt" + oneBrand.getBrandLabel() + oneBrand.getUserOwner() %>" style="display: none">
+                                                <%
+                                                    for (RouteNationTelco rnt : routeNationTelcos) {
+                                                %>
+                                                    <div style="float: left">
+                                                        <div style="float: left;color: #F78D1D;font-weight: bold;width: 53px"><%=rnt.getTelcoCode()%> </div><br/>
+                                                        <div style="float: left">
+                                                            CSKH =>
+                                                            <%
+                                                                if (!rnt.getCskh().endsWith("GROUP")) {
+                                                            %> 
+                                                            <%=rnt.getCskh().equals("0") ? "<span style='color: red;font-weight: bold'>Không Cấp</span>" : "<span style='color: blue;font-weight: bold'>" + rnt.getCskh() + "</span>"%>
+                                                            <%
+                                                                } else {
+                                                                    int nnn = rnt.getCskh().lastIndexOf("GROUP");
+                                                                    String aaa = rnt.getCskh().substring(0, nnn);
+                                                                    GroupProvider groupProvider = GroupProvider.findById(Integer.parseInt(aaa));
+                                                                    if (groupProvider != null) {
+                                                            %>
+                                                            <span style="color: blue;font-weight: bold">Nhóm : <%=groupProvider!= null ? groupProvider.getName() : "Không cấp"%></span>
+                                                            <%
+                                                                    }
+                                                                }
+                                                            %>
+                                                            <br/><!--
+                                                            QC => <%=rnt.getQc().equals("0") ? "<span style='color: red;font-weight: bold'>Không Cấp</span>" : "<span style='color: fuchsia;font-weight: bold'>" + rnt.getQc() + "</span>"%>
+                                                            <br/>-->
+                                                            Chặn trùng => <%= rnt.getDuplicate() == 1 ? "<span style='color: red;font-weight: bold'>Không</span>" : "<span style='color: blue;font-weight: bold'>Có</span>"%>
+                                                            <br/>
+                                                            Status => 
+                                                            <%=rnt.getStatus() == 0 ? "<span style='color: black;font-weight: bold'>Khóa</span>" : ""%>
+                                                            <%=rnt.getStatus() == 1 ? "<span style='color: green;font-weight: bold'>Kích hoạt</span>" : ""%>
+                                                            <%=rnt.getStatus() == 2 ? "<span style='color: red;font-weight: bold'>Chờ kích hoạt</span>" : ""%>
+                                                            <%=rnt.getStatus() == 3 ? "<span style='color: blue;font-weight: bold'>Đang kích hoạt</span>" : ""%>
+                                                            <br/>
+                                                            Nhóm => <%=rnt.getGroup().equals("0") ? "<span style='color: red;font-weight: bold'>Không phân nhóm</span>" : "<span style='color: blue;font-weight: bold'>" + rnt.getGroup() + "</span>"%>
+                                                        </div>
+                                                    </div>
+                                                <%
+                                                    }
+                                                %>
+                                            </div>
+                                        </td>
+                                        <td class="boder_right"><%=oneBrand.getCreateDate()%></td>
+                                        <td class="boder_right"><%=Account.getNameById(oneBrand.getCreateBy())%></td>
+                                        <td class="boder_right" align="center">
+                                            <a href="addDocument.jsp?bid=<%=oneBrand.getId()%>">
+                                                <img style="width: 24px;height: 25px" src="<%= request.getContextPath()%>/admin/resource/images/preview.png" title="Xem File Hồ sơ" alt="Xem"/>
+                                            </a>
+                                            <%=oneBrand.checkHasFile() ? "<b style='color:blue'>Có</b>" : "<b style='color:red'>Không</b>"%>
+                                        </td>
+                                        <td class="boder_right" align="center">
+                                            <%if (oneBrand.getStatus() == 1) {%>
+                                            <img src="<%= request.getContextPath()%>/admin/resource/images/active.png"/>
+                                            <%} else if (oneBrand.getStatus() == Tool.STATUS.DEL.val) {
+                                            %> <img width="16" src="<%= request.getContextPath()%>/admin/resource/images/shutdown.png"/><%
+                                            } else {%>
+                                            <img width="32" src="<%= request.getContextPath()%>/admin/resource/images/key_lock.png"/>
+                                            <%}%>
+                                        </td>
+                                        <%=buildControl(request, userlogin,
+                                                "/admin/brand/edit.jsp?id=" + oneBrand.getId(),
+                                                "/admin/brand/delBrand.jsp?id=" + oneBrand.getId())%>
+                                    </tr>
+                                    <%}%>
+                                </tbody>
+                            </table>
+                        </form>
+                    </div><!-- end of right content-->
+                </div>   <!--end of center content -->
+                <div class="clear"></div>
+            </div> <!--end of main content-->
+            <%@include file="/admin/includes/footer.jsp" %>
+        </div>
+    </body>
+</html>
